@@ -84,6 +84,8 @@ spec = do
       foldl (\_ x -> x) (1234::Int) Nil `shouldBe` 1234
     it "foldl (\\x a -> a + 1) 0 ('c' :. 'r' :. Nil) ~> 2" $
       foldl (\a _ -> a + 1) (0::Int) ('c' :. 'r' :. Nil :: List Char) `shouldBe` 2
+    it "foldl (\acc next -> next :. acc) Nil (1 :. 2 :. 3 :. Nil) ~> (3 :. 2 :. 1 :. Nil)" $
+      foldl (\acc next -> next :. acc) Nil (1 :. 2 :. 3 :. Nil :: List Int) `shouldBe` (3 :. 2 :. 1 :. Nil)
   describe "reverse" $ do
     it "reverse Nil ~> Nil" $
       reverse (Nil :: List Int) `shouldBe` Nil
@@ -108,7 +110,7 @@ spec = do
     it "concat [[1], [2], [3]] ~> [1, 2, 3]" $
       concat [[1], [2], [3]] `shouldBe` ([1, 2, 3] :: [Int])
   describe "intercalate" $ do
-    it "intercalate \", \" [\"hello\" \"world\"] ~> \"hello world\"" $
+    it "intercalate \", \" [\"hello\" \"world\"] ~> \"hello, world\"" $
       intercalate ", " ["hello", "world"] `shouldBe` "hello, world"
     it "intercalate [] [[1], [2], [3]] ~> [1, 2, 3]" $
       intercalate [] [[1], [2], [3]] `shouldBe` ([1, 2, 3] :: [Int])
