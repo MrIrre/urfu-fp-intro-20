@@ -130,6 +130,11 @@ module Lecture06 where
   если нет, то докажите это (напишите, почему)
 
   *Решение*
+
+  x x - аппликация x самому к себе. Это значит, что она имеет тип X -> T. T - произвольный. Его аргумент тоже X.
+  Получается X = X -> T. Это тип рекурсивен, так как мы можем выражать X хоть сколько раз. Тип не может быть
+  подвыражением самого себя, потому что все типы имеют конечный размер.
+  Ответ: нет.
 -}
 -- </Задачи для самостоятельного решения>
 
@@ -326,7 +331,8 @@ module Lecture06 where
   Убедитесь, что selfApp работает. Приведите терм `selfApp id` в нормальную форму
   и запишите все шаги β-редукции ->β.
 
-  selfApp id = ... ->β ...
+  id = λx:∀X.X->X.x
+  selfApp id = (λf:∀X.X->X.f [∀Y.Y->Y] f) (id:∀Z.Z->Z) ->β (λf:(∀Y.Y->Y)->(∀Y.Y->Y).f f) (id:∀Z.Z->Z) ->β id id
 -}
 -- </Задачи для самостоятельного решения>
 
@@ -578,16 +584,16 @@ module Lecture06 where
 -}
 
 f :: [a] -> Int
-f = error "not implemented"
+f = length
 
 g :: (a -> b)->[a]->[b]
-g = error "not implemented"
+g = map
 
 q :: a -> a -> a
-q x y = error "not implemented"
+q x y = x -- first value const
 
 p :: (a -> b) -> (b -> c) -> (a -> c)
-p f g = error "not implemented"
+p f g = g . f
 
 {-
   Крестики-нолики Чёрча.
@@ -624,7 +630,10 @@ createRow x y z = \case
   Third -> z
 
 createField :: Row -> Row -> Row -> Field
-createField x y z = error "not implemented"
+createField x y z = \case
+  First -> x
+  Second -> y
+  Third -> z
 
 -- Чтобы было с чего начинать проверять ваши функции
 emptyField :: Field
@@ -633,17 +642,37 @@ emptyField = createField emptyLine emptyLine emptyLine
     emptyLine = createRow Empty Empty Empty
 
 setCellInRow :: Row -> Index -> Value -> Row
-setCellInRow r i v = error "not implemented"
+setCellInRow r i v = \index -> if index == i then v else r index
 
 -- Возвращает новое игровое поле, если клетку можно занять.
 -- Возвращает ошибку, если место занято.
 setCell :: Field -> Index -> Index -> Value -> Either String Field
-setCell field i j v = error "not implemented"
+setCell field i j v = case (field i j) of
+  Empty -> Right newField
+  value -> Left $ "There is '" ++ show value ++ "' on " ++ show i ++ " " ++ show j
+  where
+        newField = \row -> if i == row then setCellInRow (field i) j v else field row
 
 data GameState = InProgress | Draw | XsWon | OsWon deriving (Eq, Show)
 
 getGameState :: Field -> GameState
-getGameState field = error "not implemented"
+getGameState field
+  | checkWin Cross = XsWon
+  | checkWin Zero  = OsWon
+  | isInProgress   = InProgress
+  | otherwise      = Draw
+  where
+    getValue           = \(row, column) -> field row column
+    indexes            = [First, Second, Third]
+    rows               = [[(i, j) | j <- indexes] | i <- indexes]
+    columns            = [[(i, j) | i <- indexes] | j <- indexes]
+    mainDiagonal       = zip indexes indexes
+    antidiagonal       = [(First, Third), (Second, Second), (Third, First)]
+    diagonals          = [mainDiagonal, antidiagonal]
+    allWinTriples      = rows ++ columns ++ diagonals
+    valuesInWinTriples = map (map getValue) allWinTriples
+    checkWin           = \team -> any (all $ \value -> value == team) valuesInWinTriples
+    isInProgress       = any (any $ \value -> value == Empty) valuesInWinTriples
 
 -- </Задачи для самостоятельного решения>
 
