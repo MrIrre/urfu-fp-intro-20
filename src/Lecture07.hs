@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-unused-imports #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Lecture07 where
 
 import Lecture07.Money
@@ -9,7 +10,6 @@ import Data.Foldable
 
 {-
   07: Классы типов
-
   - ad-hoc polymorphism (overloading)
   - классы типов
     - Синтаксис
@@ -50,7 +50,6 @@ import Data.Foldable
 
 {-
   Реализуйте инстанс Show для Expr:
-
     - Number 0 ~> 0
     - Plus (Number 0) (Number 3) ~> 0 + 3
     - Abs (Plus (Number 0) (Number 3)) ~> |0 + 3|
@@ -63,45 +62,85 @@ data Expr
   | Mult Expr Expr
   | UnaryMinus Expr
   | Abs Expr
-  deriving Eq
+  deriving (Eq)
 
+
+binaryShow :: String -> Expr -> Expr -> String
+binaryShow div fst snd = bracketsShow fst <> div <> bracketsShow snd
+
+bracketsShow :: Expr -> String
+bracketsShow expr = case expr of
+  Plus _ _  -> mkBrackets (show expr)
+  Minus _ _ -> mkBrackets (show expr)
+  Mult _ _  -> mkBrackets (show expr)
+  _         -> show expr
+
+{-# INLINE mkBrackets #-}
+mkBrackets :: String -> String
+mkBrackets expr = "(" <> expr <> ")"
+
+instance Show Expr where
+  show (Number num)      = show num
+  show (Plus fst snd)    = binaryShow " + " fst snd
+  show (Minus fst snd)   = binaryShow " - " fst snd
+  show (Mult fst snd)    = binaryShow " * " fst snd
+  show (UnaryMinus expr) = "-" <> mkBrackets (show expr)
+  show (Abs expr)        = "|" <> show expr <> "|"
 {-
   Реализуйте instance Semigroup для вектора:
 -}
 newtype Vec a = Vec { unVec :: [a] } deriving (Eq, Show)
 
+instance Semigroup (Vec Integer) where
+  Vec a <> Vec b = Vec { unVec = map (\x -> fst x + snd x) (a `zip` b) }
 {-
   Реализуйте instance Semigroup для типа для логгирования:
 -}
 newtype LogEntry = LogEntry { unLogEntry :: String } deriving (Eq, Show)
+
+instance Semigroup LogEntry where
+  a <> b = LogEntry { unLogEntry = unLogEntry a <> unLogEntry b }
 
 {-
   В `src/Lecture07/Money.hs` определены:
     - тип `Money a` для денег
     - типы `USD` и `RUB` для представления валют
     - конструкторы `mkDollars` и `mkRubbles`
-
   Реализуйте инстансы Semigroup для Money a.
 -}
+instance Semigroup (Money USD) where
+  a <> b = mkDollars (getMoney a + getMoney b)
 
+instance Semigroup (Money RUB) where
+  a <> b = mkRubbles (getMoney a + getMoney b)
 {-
   Реализуйте инстанс Functor для ExactlyOne
 -}
 data ExactlyOne a = ExactlyOne a deriving (Eq, Show)
+
+instance Functor ExactlyOne where
+  fmap f (ExactlyOne a) = ExactlyOne (f a)
 
 {-
   Реализуйте инстанс Functor для `Maybe a`
 -}
 data Maybe' a = Just' a | Nothing' deriving (Eq, Show)
 
+instance Functor Maybe' where
+  fmap _ Nothing'  = Nothing'
+  fmap f (Just' a) = Just' (f a)
+
 {-
   Реализуйте инстанс Functor для `List a`
 -}
 data List a = Nil | Cons a (List a) deriving (Eq, Show)
 
+instance Functor List where
+  fmap _ Nil              = Nil
+  fmap f (Cons head tail) = Cons (f head) (fmap f tail)
+
 {-
   `FileTree a` — тип для представления дерева файловой системы.
-
   Параметр `a` позволяет населять файлы произвольным значением.
 -}
 data FileTree a
@@ -120,7 +159,6 @@ data FileInfo = FileInfo
 
 {-
   Тогда мы можем строить деревья типа `FileTree FileInfo` и работать с ними.
-
   Например ниже определены функции для вычисления суммы всех размеров файлов в дереве
   и нахождения последней даты обновления файла в дереве.
 -}
@@ -146,12 +184,13 @@ latestModified = getMax . foldMap (\FileInfo{..} -> Max modified)
 -}
 
 instance Foldable FileTree where
-  foldMap = undefined
+  foldMap _ Empty         = mempty
+  foldMap f (File _ info) = f info
+  foldMap f (Dir _ nodes) = mconcat (map (foldMap f) nodes)
 
 {-
   В этом задании вам необходимо придумать и написать иерархию исключений
   с помощью классов типов на основе набора требований:
-
   1. Базовый класс Exception с возможностью получения сообщения ошибки
   2. Класс для API ошибок. Должен уметь возвращать
     - ошибку в формате JSON
@@ -160,8 +199,34 @@ instance Foldable FileTree where
     - дополнительно возвращает сообщение об ошибке от базы данных
   4. Класс для ошибок доменной логики
     - дополнительно возвращает контекс с данными
-
   Реализовывать инстансы не нужно.
 -}
+
+class Exception e where
+  message :: e -> String
+
+
+data Json = JsonNull |
+            JsonBool !Bool |
+            JsonNum !Rational |
+            JsonString !String |
+            JsonArray [Json] |
+            JsonObject [JsonKV]
+            deriving Eq
+
+data JsonKV = JsonKV { key :: String, value :: Json } deriving (Eq)
+
+data LogLevel = Info | Debug | Warn | Error deriving (Eq)
+
+class ApiException e where
+  jsonMessage :: e -> Json
+
+  logLevel :: e -> LogLevel
+
+class DbException e where
+  dbError :: e -> String
+
+class DomainException e ctx where
+  context :: e -> ctx
 
 -- </Задачи для самостоятельного решения>

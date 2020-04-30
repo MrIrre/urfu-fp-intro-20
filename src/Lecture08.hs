@@ -6,7 +6,7 @@ module Lecture08 where
 import Data.Char
 import Data.Array
 import qualified Data.Set as Set
-import qualified Data.IntMap as Map
+import qualified Data.Map as Map (fromList, insert, (!), Map)
 
 {- 08: Структуры данных
 
@@ -41,18 +41,20 @@ import qualified Data.IntMap as Map
 data Stack a = Stack [a] deriving (Eq, Show)
 
 createStack :: Stack a
-createStack = error "not implemented"
+createStack = Stack[]
 
 -- Обратите внимание, что все структуры данных неизменяемые (immutable). Значит, если операция
 -- предполагает изменение структуры, то она просто должна возвращать новую уже изменённую версию.
 push :: Stack a -> a -> Stack a
-push stack x = error "not implemented"
+push (Stack xs) x = Stack $ x : xs
 
 pop :: Stack a -> Maybe (Stack a)
-pop stack = error "not implemented"
+pop (Stack []) = Nothing
+pop (Stack (x:xs)) = Just $ Stack xs
 
 peek :: Stack a -> Maybe a
-peek stack = error "not implemented"
+peek (Stack []) = Nothing
+peek (Stack (x:_)) = Just x
 
 -- </Задачи для самостоятельного решения>
 
@@ -170,17 +172,20 @@ dequeue' (q:qs) = (q, qs)             -- возвращаем (элемент, �
 data Queue a = Queue [a] [a] deriving (Eq, Show)
 
 createQueue :: Queue a
-createQueue = error "not implemented"
+createQueue = Queue [] []
 
 enqueue :: Queue a -> a -> Queue a
-enqueue queue x = error "not implemented"
+enqueue (Queue ls rs) x = Queue (x:ls) rs
 
 -- если очередь пустая возвращает ошибку
 dequeue :: Queue a -> (a, Queue a)
-dequeue queue = error "not implemented"
+dequeue (Queue [] [])     = error "Empty Queue"
+dequeue (Queue ls []) = dequeue $ Queue [] $ reverse ls
+dequeue (Queue ls (r:rs)) = (r, Queue ls rs)
 
 isEmpty :: Queue a -> Bool
-isEmpty queue = error "not implemented"
+isEmpty (Queue [] []) = True
+isEmpty otherwise     = False
 
 -- </Задачи для самостоятельного решения>
 
@@ -357,7 +362,7 @@ emptySet = Set.intersection evenSet oddSet
       - [Int]
       - Array
       - Один из Map, IntMap или Data.HashMap
-    - написать сортировку с использованияем этого класса типов
+    - написать сортировку с использованием этого класса типов
 
   Вы можете сравнить скорость работы разных реализаций с помощью функции computeTime, которая
   принимает на вход:
@@ -378,14 +383,45 @@ emptySet = Set.intersection evenSet oddSet
 
 -- Названия методов можно менять
 class IntArray a where
-  fromList :: [(Int, Int)] -> a    -- создать из списка пар [(index, value)]
-  toList :: a -> [(Int, Int)]      -- преобразовать в список пар [(index, value)]
-  update :: a -> Int -> Int -> a   -- обновить элемент по индексу
-  (#) :: a -> Int -> Int           -- получить элемент по индексу
+  update   :: a -> Int -> Int -> a
+  (#)      :: a -> Int -> Int
+  rep      :: Int -> Int -> a
+  isEmpty' :: a -> Bool
+
+instance IntArray [Int] where
+  update xs i x = take i xs ++ (x : drop (i + 1) xs)
+  (#) xs i      = xs !! i
+  rep n x       = replicate n x
+  isEmpty' xs
+    | null xs = True
+    | otherwise = False
+
+instance IntArray (Array Int Int) where
+  update xs i x = xs // [(i, x)]
+  (#) xs i      = xs ! i
+  rep n x       = array (0, n) [(i, x) | i <- [0..n]]
+  isEmpty' xs
+      | null xs = True
+      | otherwise = False
+
+instance IntArray (Map.Map Int Int) where
+  update xs i x = Map.insert i x xs
+  (#) xs i      = xs Map.! i
+  rep n x       = Map.fromList [(i, x) | i <- [0..n]]
+  isEmpty' xs
+      | null xs = True
+      | otherwise = False
 
 -- Сортирует массив целых неотрицательных чисел по возрастанию
 countingSort :: forall a. IntArray a => [Int] -> [Int]
-countingSort = error "not implemented"
+countingSort xs
+    | isEmpty' xs = xs
+    | otherwise = foldl (\r i -> r ++ (replicate ((#) counts i) i)) [] [0..(max-1)]
+    where
+      max = maximum xs + 1
+      counts = foldl (\zs -> \i -> update zs i (((#) zs i) + 1)) (rep max 0 :: a) xs
+
+
 
 {-
   Tак можно запустить функцию сортировки с использованием конкретной реализацией массива:
