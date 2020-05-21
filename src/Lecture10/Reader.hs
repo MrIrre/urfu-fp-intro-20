@@ -4,6 +4,7 @@ import Data.List
 import Data.Maybe
 import Control.Monad.Reader
 import Prelude hiding (id)
+import Text.Format
 
 -- <Задачи для самостоятельного решения>
 
@@ -60,20 +61,44 @@ persons =
   , Person 9 "Антонов" "Юрий" "Васильевич" Male Nothing
   ]
 
+singleMsg :: String
+singleMsg = "Разрешите предложить Вам наши услуги."
+pluralMsg :: String
+pluralMsg = "Разрешите предложить вам наши услуги."
+
 -- Поиск персоны по номеру
 findById :: PersonId -> Reader [Person] (Maybe Person)
-findById pId = error "not implemented"
+findById pId = do
+  ps <- ask
+  return $ find (\p -> id p == pId) ps
 
 processSingle :: Person -> String
-processSingle p = error "not implemented"
+processSingle (Person _ _ name patronymic sex Nothing) = case sex of
+  Male -> format "Уважаемый {0} {1}!\n{2}" [name, patronymic, singleMsg]
+  Female -> format "Уважаемая {0} {1}!\n{2}" [name, patronymic, singleMsg]
+processSingle _ = error "Not single"
 
 processPair :: Person -> Person -> String
-processPair husband wife = error "not implemented"
+processPair (Person hId _ hName hPatronymic _ (Just wId')) (Person wId _ wName wPatronymic _ (Just hId'))
+            | wId' == wId && hId' == hId =
+  format "Уважаемые {0} {1} и {2} {3}!\n{4}" [hName, hPatronymic, wName, wPatronymic, pluralMsg]
+processPair _ _ = error "Not married"
 
 processPerson :: PersonId -> Reader [Person] (Maybe String)
-processPerson pId = error "not implemented"
+processPerson pId = do
+  firstPerson <- findById pId
+  secondPerson <- case firstPerson of
+    Just (Person _ _ _ _ _ (Just secondId)) -> findById secondId
+    _ -> return $ Nothing
+  return $ case (firstPerson, secondPerson) of
+    (Just husband@(Person _ _ _ _ Male _) , Just wife@(Person _ _ _ _ Female _)) -> Just (processPair husband wife)
+    (Just wife@(Person _ _ _ _ Female _) , Just husband@(Person _ _ _ _ Male _)) -> Just (processPair husband wife)
+    (Just person, _) -> Just (processSingle person)
+    _ -> Nothing
 
 processPersons :: [PersonId] -> [Maybe String]
-processPersons personIds = error "not implemented"
+processPersons personIds = do
+  pId <- personIds
+  return (runReader (processPerson pId) persons)
 
 -- </Задачи для самостоятельного решения>
