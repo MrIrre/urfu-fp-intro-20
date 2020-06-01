@@ -11,7 +11,7 @@ import Servant.API
 import GHC.Generics
 
 import DB.MovieSession
-import DB.Seat
+import DB.Seat (SeatId)
 import DB.Internal
 
 {-
@@ -34,8 +34,8 @@ newtype BookingId = BookingId
 data Booking = Booking
   { bookingId :: BookingId
   , seatId :: SeatId
-  , isPreliminary :: Bool
   , movieSessionId :: MovieSessionId
+  , isPreliminary :: Bool
   , createdAt :: UTCTime
   } deriving (Eq, Show, Generic)
 -- Класс Generic отвечает за универсальное кодирование типа, т.е. за  такое представление,
@@ -51,6 +51,9 @@ instance ToJSON Booking
 instance FromJSON Booking
 -- ^ возможность для работы с JSON
 
+expirationTime :: NominalDiffTime
+expirationTime = fromInteger 600 -- в секундах
+
 {-
   Booking запрос должен проверить наличие предварительного бронирования.
   Если оно существует и прошло меньше 10 минут от создания, то бронирование
@@ -58,6 +61,32 @@ instance FromJSON Booking
 -}
 tryBook
   :: DBMonad m
+  => Booking
+  -> m (Maybe String)
+tryBook booking = runSQL $ \conn -> do
+  if not (isPreliminary booking)
+    then return $ Just "Booking has already been paid"
+  else do
+    curTime <- getCurrentTime
+    if (diffUTCTime curTime (createdAt booking)) < expirationTime
+      then do
+        execute conn "UPDATE bookings SET is_preliminary = false WHERE id = ?" (bookingId booking)
+        execute conn "UPDATE seats SET available = false WHERE id = ?" (seatId booking)
+        return Nothing
+      else do
+        execute conn "DELETE FROM bookings WHERE id = ?" (bookingId booking)
+        return $ Just "Booking has been deleted since it has expired"
+
+getBook
+  :: DBMonad m
   => BookingId
-  -> m Bool
-tryBook = undefined
+  -> m [Booking]
+getBook bookingId = runSQL $ \conn ->
+  query conn "SELECT * from bookings where id = ? " bookingId
+
+deleteBook
+  :: DBMonad m
+  => BookingId
+  -> m ()
+deleteBook bookingId = runSQL $ \conn ->
+  execute conn "DELETE FROM bookings WHERE id = ?" (bookingId)

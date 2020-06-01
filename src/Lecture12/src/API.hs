@@ -3,12 +3,14 @@ module API
   , bookMovieAPI
   , module API.Session
   , module API.Preliminary
+  , module API.Payment
   -- ^ экспортируем модули, чтобы их содержимое было доступно вместе с модулем `API`
   ) where
 
 import Servant
 import API.Session
 import API.Preliminary
+import API.Payment
 
 {-
   API тип всего приложения, который описывает API методы.
@@ -20,7 +22,7 @@ import API.Preliminary
 type BookMovieAPI
   = MovieSessionsAPI
   :<|> PreliminaryAPI
-
+  :<|> PaymentAPI
 {-
   Proxy — это особенный тип, который не содержит данных.
   Он определен следующим образом в Data`.Proxy`:
