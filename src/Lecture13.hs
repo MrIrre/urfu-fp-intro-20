@@ -8,6 +8,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fwarn-incomplete-patterns -Werror #-}
 
 module Lecture13 where
@@ -81,7 +83,7 @@ import Data.Kind
 -- Нам нужно придумать, как изменить тип этой функции так, чтобы программа,
 -- содержащая `safeHead []` не компилировалась
 safeHeadList :: [a] -> a
-safeHeadList = undefined -- ???
+safeHeadList ~(x:_) = x
 
 -- Подумайте, как можно это сделать?
 
@@ -365,8 +367,10 @@ instance ShowAll xs => Show (HList xs) where
 -- <Задачи для самостоятельного решения>
 
 -- Реализуйте instance Eq для HList
-instance Eq (HList xs) where
- (==) = error "not implemented"
+instance Eq (HList '[]) where
+  HNil == HNil = True
+instance (Eq x1, Eq (HList xs1)) => Eq (HList (x1 ': xs1)) where
+  (HCons x1 xs1) == (HCons x2 xs2) = x1 == x2 && xs1 == xs2
 
 -- </Задачи для самостоятельного решения>
 
@@ -649,7 +653,12 @@ getAt (SSucc m) (VCons _ (VCons x xs)) = getAt m (VCons x xs)
 
 -- Напишите аналог zip для Vec n
 vzip :: Vec a n -> Vec b n -> Vec (a, b) n
-vzip = error "not implemented"
+vzip = \case
+         VNil -> \case
+           VNil -> VNil
+         (VCons x xs) -> \case
+           (VCons y ys) -> VCons (x,y) (vzip xs ys)
+
 -- </Задачи для самостоятельного решения>
 
 {- printf
